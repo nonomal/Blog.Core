@@ -4,7 +4,7 @@
 
 		<OutputType>Exe</OutputType>
 
-		<TargetFramework>net5.0</TargetFramework>
+		<TargetFramework>net6.0</TargetFramework>
 		<!--<AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>-->
 		<AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -44,9 +44,9 @@
 
 	<ItemGroup>
 	
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.9.10" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.8" />
 	
-		<PackageReference Include="System.Text.Encoding.CodePages" Version="5.0.0" />
+		<PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0-preview.6.21352.12" />
 	</ItemGroup>
 
 	<ItemGroup>

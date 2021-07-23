@@ -31,6 +31,12 @@ namespace Blog.Core.Extensions
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             // configuration (resolvers, counter key builders)
             services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+            services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
+
+            // 也可以直接，添加内存模式下的限流全部相关依赖
+            // https://github.com/stefanprodan/AspNetCoreRateLimit/releases/tag/4.0.0
+            //services.AddInMemoryRateLimiting();
         }
     }
 }
