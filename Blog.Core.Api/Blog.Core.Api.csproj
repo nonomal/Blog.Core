@@ -1,14 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-
     <OutputType>Exe</OutputType>
-
-    <TargetFramework>net6.0</TargetFramework>
 	<ImplicitUsings>enable</ImplicitUsings>
-    <AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>
+    <!--<AspNetCoreHostingModel>OutOfProcess</AspNetCoreHostingModel>-->
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -26,32 +24,51 @@
   <ItemGroup>
     <Compile Remove="Extensions\**" />
     <Compile Remove="Hubs\**" />
+    <Compile Remove="Logs\**" />
+    <Compile Remove="Log\**" />
     <Compile Remove="Middlewares\**" />
     <Compile Remove="wwwroot\ui\**" />
     <Content Remove="Extensions\**" />
     <Content Remove="Hubs\**" />
+    <Content Remove="Logs\**" />
+    <Content Remove="Log\**" />
     <Content Remove="Middlewares\**" />
     <Content Remove="wwwroot\ui\**" />
     <EmbeddedResource Remove="Extensions\**" />
     <EmbeddedResource Remove="Hubs\**" />
+    <EmbeddedResource Remove="Logs\**" />
+    <EmbeddedResource Remove="Log\**" />
     <EmbeddedResource Remove="Middlewares\**" />
     <EmbeddedResource Remove="wwwroot\ui\**" />
     <None Remove="Extensions\**" />
     <None Remove="Hubs\**" />
+    <None Remove="Logs\**" />
+    <None Remove="Log\**" />
     <None Remove="Middlewares\**" />
     <None Remove="wwwroot\ui\**" />
+    <None Remove="wwwroot\Temp\**" />
+    <Compile Remove="wwwroot\Temp\**" />
+    <EmbeddedResource Remove="wwwroot\Temp\**" />
+    <Content Remove="wwwroot\Temp\**" />
   </ItemGroup>
 
   <ItemGroup>
     <None Remove="index.html" />
+    <None Remove="WangWu.db" />
+    <None Remove="WMBlog.db" />
+    <None Remove="WMBlogLog.db" />
+    <None Remove="WMBlogLog.db-journal" />
+    <None Remove="ZhaoLiu.db" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="log4mongo-netcore" Version="3.2.0" />
     <PackageReference Include="MicroKnights.Log4NetAdoNetAppender" Version="2.2.0" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.9.10" />
-    <PackageReference Include="SkyAPM.Agent.AspNetCore" Version="1.3.0" />
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="5.0.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
+    <PackageReference Include="SkyAPM.Agent.AspNetCore" Version="2.1.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+	<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
+	<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -78,6 +95,9 @@
     <Content Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Update="wwwroot\ui.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -87,6 +107,10 @@
     <None Update="StopContainerImg.sh">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\BlogCore.Data.excel\" />
   </ItemGroup>
 
   <ProjectExtensions>

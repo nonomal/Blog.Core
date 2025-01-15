@@ -7,7 +7,7 @@ namespace Blog.Core.Model.Models
     /// <summary>
     /// 路由菜单表
     /// </summary>
-    public class Permission : PermissionRoot<int>
+    public class Permission : PermissionRoot<long>
     {
         public Permission()
         {
@@ -57,6 +57,11 @@ namespace Blog.Core.Model.Models
         [SugarColumn(Length = 100, IsNullable = true)]
         public string Icon { get; set; }
         /// <summary>
+        /// 菜单图标新
+        /// </summary>
+        [SugarColumn(Length = 100, IsNullable = true)]
+        public string IconNew { get; set; }
+        /// <summary>
         /// 菜单描述    
         /// </summary>
         [SugarColumn(Length = 100, IsNullable = true)]
@@ -69,7 +74,7 @@ namespace Blog.Core.Model.Models
         /// 创建ID
         /// </summary>
         [SugarColumn(IsNullable = true)]
-        public int? CreateId { get; set; }
+        public long? CreateId { get; set; }
         /// <summary>
         /// 创建者
         /// </summary>
@@ -84,7 +89,7 @@ namespace Blog.Core.Model.Models
         /// 修改ID
         /// </summary>
         [SugarColumn(IsNullable = true)]
-        public int? ModifyId { get; set; }
+        public long? ModifyId { get; set; }
         /// <summary>
         /// 修改者
         /// </summary>

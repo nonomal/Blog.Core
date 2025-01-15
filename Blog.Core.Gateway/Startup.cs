@@ -1,14 +1,11 @@
 ﻿using Blog.Core.AuthHelper;
 using Blog.Core.Common;
+using Blog.Core.Common.Caches;
 using Blog.Core.Extensions;
 using Blog.Core.Gateway.Extensions;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Nacos.V2.DependencyInjection;
+using System.Reflection;
+using Blog.Core.Common.Caches.Interface;
 
 namespace Blog.Core.AdminMvc
 {
@@ -32,17 +29,10 @@ namespace Blog.Core.AdminMvc
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingleton(new Appsettings(Configuration));
-
-            services.AddAuthentication_JWTSetup();
+            services.AddSingleton(new AppSettings(Configuration));
 
             services.AddAuthentication()
                .AddScheme<AuthenticationSchemeOptions, CustomAuthenticationHandler>(Permissions.GWName, _ => { });
-
-
-            services.AddNacosV2Config(Configuration, null, "nacosConfig");
-            services.AddNacosV2Naming(Configuration, null, "nacos");
-            services.AddHostedService<ApiGateway.Helper.OcelotConfigurationTask>();
 
 
             services.AddCustomSwaggerSetup();
@@ -52,6 +42,10 @@ namespace Blog.Core.AdminMvc
             services.AddHttpContextSetup();
 
             services.AddCorsSetup();
+
+            services.AddMemoryCache();
+            services.AddDistributedMemoryCache();
+            services.AddSingleton<ICaching, Caching>();
 
             services.AddCustomOcelotSetup();
         }
@@ -69,9 +63,9 @@ namespace Blog.Core.AdminMvc
             app.UseAuthentication();
             app.UseAuthorization();
 
-            app.UseCustomSwaggerMildd();
+            app.UseCustomSwaggerMildd(() => Assembly.GetExecutingAssembly().GetManifestResourceStream("Blog.Core.Gateway.index.html"));
 
-            app.UseCors(Appsettings.app(new string[] { "Startup", "Cors", "PolicyName" }));
+            app.UseCors(AppSettings.app(new string[] { "Startup", "Cors", "PolicyName" }));
 
             app.UseEndpoints(endpoints =>
             {
@@ -79,7 +73,7 @@ namespace Blog.Core.AdminMvc
             });
 
             app.UseMiddleware<CustomJwtTokenAuthMiddleware>();
-           
+
             app.UseCustomOcelotMildd().Wait();
         }
     }

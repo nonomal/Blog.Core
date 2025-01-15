@@ -1,15 +1,10 @@
-﻿using System;
-using System.Net;
-using System.Linq;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Http;
 using Blog.Core.Common;
+using Blog.Core.Common.Caches;
+using Blog.Core.Common.Caches.Interface;
 using Blog.Core.Common.Helper;
-using Nacos.V2;
-using Newtonsoft.Json.Linq;
 
 namespace Blog.Core.AuthHelper
 {
@@ -22,7 +17,6 @@ namespace Blog.Core.AuthHelper
     {
         private readonly ICaching _cache;
       
-        private readonly INacosNamingService NacosServClient;
        
         /// <summary>
         /// 验证方案提供对象
@@ -35,13 +29,11 @@ namespace Blog.Core.AuthHelper
         private readonly RequestDelegate _next;
         
 
-        public CustomJwtTokenAuthMiddleware(INacosNamingService serv, RequestDelegate next, IAuthenticationSchemeProvider schemes, Appsettings appset,ICaching cache)
+        public CustomJwtTokenAuthMiddleware(RequestDelegate next, IAuthenticationSchemeProvider schemes, AppSettings appset,ICaching cache)
         {
-            NacosServClient = serv;
             _cache = cache;
             _next = next;
             Schemes = schemes;
-            List<PermissionItem> Permissions = _cache.Cof_AsyncGetICaching<List<PermissionItem>>("Permissions", GetPermitionData, 10).GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -65,7 +57,7 @@ namespace Blog.Core.AuthHelper
                 return;
             }
 
-            List<PermissionItem> Permissions= await _cache.Cof_AsyncGetICaching<List<PermissionItem>>("Permissions", GetPermitionData, 10);
+            List<PermissionItem> Permissions= new();
 
             httpContext.Features.Set<IAuthenticationFeature>(new AuthenticationFeature
             {
@@ -125,28 +117,6 @@ namespace Blog.Core.AuthHelper
             await _next.Invoke(httpContext);
         }
 
-        private async Task<List<PermissionItem>> GetPermitionData()
-        {
-            try
-            {
-                string PermissionServName = Appsettings.GetValue("ApiGateWay:PermissionServName");
-                string PermissionServGroup = Appsettings.GetValue("ApiGateWay:PermissionServGroup");
-                string PermissionServUrl = Appsettings.GetValue("ApiGateWay:PermissionServUrl");
-
-                string requestdata = await NacosServClient.Cof_NaoceGet(PermissionServName, PermissionServGroup, PermissionServUrl);
-                if (string.IsNullOrEmpty(requestdata)) return null;
-                JToken perJt = JToken.Parse(requestdata);
-                if(perJt["response"]!=null) return perJt["response"].ToObject<List<PermissionItem>>();
-                return perJt["data"].ToObject<List<PermissionItem>>();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-
-            return null;
-        }
-
         /// <summary>
         /// 返回相应
         /// </summary>
@@ -168,7 +138,7 @@ namespace Blog.Core.AuthHelper
         /// <returns></returns>
         public bool CheckWhiteList(string url)
         {
-            List<Urlobj> WhiteList = _cache.Cof_GetICaching<List<Urlobj>>("WhiteList", () => Appsettings.app<Urlobj>("WhiteList"), 10);
+            List<Urlobj> WhiteList = _cache.Cof_GetICaching<List<Urlobj>>("WhiteList", () => AppSettings.app<Urlobj>("WhiteList"), 10);
 
             if (!WhiteList.Cof_CheckAvailable()) return false;
             foreach (var Urlitem in WhiteList)
@@ -189,7 +159,7 @@ namespace Blog.Core.AuthHelper
 
         public bool CheckBlackList(string url)
         {
-            List<Urlobj> BlackList = _cache.Cof_GetICaching<List<Urlobj>>("BlackList", () => Appsettings.app<Urlobj>("BlackList"), 10);
+            List<Urlobj> BlackList = _cache.Cof_GetICaching<List<Urlobj>>("BlackList", () => AppSettings.app<Urlobj>("BlackList"), 10);
             
             if (!BlackList.Cof_CheckAvailable()) return false;
             foreach (var Urlitem in BlackList)

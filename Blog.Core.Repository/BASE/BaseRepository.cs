@@ -1,55 +1,74 @@
 ﻿using Blog.Core.Common;
 using Blog.Core.Common.DB;
 using Blog.Core.IRepository.Base;
-using Blog.Core.IRepository.UnitOfWork;
 using Blog.Core.Model;
+using Blog.Core.Model.Models;
+using Blog.Core.Model.Tenants;
+using Blog.Core.Repository.UnitOfWorks;
+using OfficeOpenXml.FormulaParsing.Excel.Functions.DateTime;
 using SqlSugar;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Blog.Core.Repository.Base
 {
     public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : class, new()
     {
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly IUnitOfWorkManage _unitOfWorkManage;
         private readonly SqlSugarScope _dbBase;
 
         private ISqlSugarClient _db
         {
             get
             {
-                /* 如果要开启多库支持，
-                 * 1、在appsettings.json 中开启MutiDBEnabled节点为true，必填
-                 * 2、设置一个主连接的数据库ID，节点MainDB，对应的连接字符串的Enabled也必须true，必填
-                 */
-                if (Appsettings.app(new string[] { "MutiDBEnabled" }).ObjToBool())
+                ISqlSugarClient db = _dbBase;
+
+                //修改使用 model备注字段作为切换数据库条件，使用sqlsugar TenantAttribute存放数据库ConnId
+                //参考 https://www.donet5.com/Home/Doc?typeId=2246
+                var tenantAttr = typeof(TEntity).GetCustomAttribute<TenantAttribute>();
+                if (tenantAttr != null)
                 {
-                    if (typeof(TEntity).GetTypeInfo().GetCustomAttributes(typeof(SugarTable), true).FirstOrDefault((x => x.GetType() == typeof(SugarTable))) is SugarTable sugarTable && !string.IsNullOrEmpty(sugarTable.TableDescription))
+                    //统一处理 configId 小写
+                    db = _dbBase.GetConnectionScope(tenantAttr.configId.ToString().ToLower());
+                    return db;
+                }
+
+                //多租户
+                var mta = typeof(TEntity).GetCustomAttribute<MultiTenantAttribute>();
+                if (mta is { TenantType: TenantTypeEnum.Db })
+                {
+                    //获取租户信息 租户信息可以提前缓存下来 
+                    if (App.User is { TenantId: > 0 })
                     {
-                        _dbBase.ChangeDatabase(sugarTable.TableDescription.ToLower());
-                    }
-                    else
-                    {
-                        _dbBase.ChangeDatabase(MainDb.CurrentDbConnId.ToLower());
+                        var tenant = db.Queryable<SysTenant>().WithCache().Where(s => s.Id == App.User.TenantId).First();
+                        if (tenant != null)
+                        {
+                            var iTenant = db.AsTenant();
+                            if (!iTenant.IsAnyConnection(tenant.ConfigId))
+                            {
+                                iTenant.AddConnection(tenant.GetConnectionConfig());
+                            }
+
+                            return iTenant.GetConnectionScope(tenant.ConfigId);
+                        }
                     }
                 }
 
-                return _dbBase;
+                return db;
             }
         }
 
         public ISqlSugarClient Db => _db;
 
-        public BaseRepository(IUnitOfWork unitOfWork)
+        public BaseRepository(IUnitOfWorkManage unitOfWorkManage)
         {
-            _unitOfWork = unitOfWork;
-            _dbBase = unitOfWork.GetDbClient();
+            _unitOfWorkManage = unitOfWorkManage;
+            _dbBase = unitOfWorkManage.GetDbClient();
         }
-
 
 
         public async Task<TEntity> QueryById(object objId)
@@ -57,6 +76,7 @@ namespace Blog.Core.Repository.Base
             //return await Task.Run(() => _db.Queryable<TEntity>().InSingle(objId));
             return await _db.Queryable<TEntity>().In(objId).SingleAsync();
         }
+
         /// <summary>
         /// 功能描述:根据ID查询一条数据
         /// 作　　者:Blog.Core
@@ -67,7 +87,7 @@ namespace Blog.Core.Repository.Base
         public async Task<TEntity> QueryById(object objId, bool blnUseCache = false)
         {
             //return await Task.Run(() => _db.Queryable<TEntity>().WithCacheIF(blnUseCache).InSingle(objId));
-            return await _db.Queryable<TEntity>().WithCacheIF(blnUseCache).In(objId).SingleAsync();
+            return await _db.Queryable<TEntity>().WithCacheIF(blnUseCache, 10).In(objId).SingleAsync();
         }
 
         /// <summary>
@@ -87,7 +107,7 @@ namespace Blog.Core.Repository.Base
         /// </summary>
         /// <param name="entity">博文实体类</param>
         /// <returns></returns>
-        public async Task<int> Add(TEntity entity)
+        public async Task<long> Add(TEntity entity)
         {
             //var i = await Task.Run(() => _db.Insertable(entity).ExecuteReturnBigIdentity());
             ////返回的i是long类型,这里你可以根据你的业务需要进行处理
@@ -98,9 +118,8 @@ namespace Blog.Core.Repository.Base
             //这里你可以返回TEntity，这样的话就可以获取id值，无论主键是什么类型
             //var return3 = await insert.ExecuteReturnEntityAsync();
 
-            return await insert.ExecuteReturnIdentityAsync();
+            return await insert.ExecuteReturnSnowflakeIdAsync();
         }
-
 
         /// <summary>
         /// 写入实体数据
@@ -108,16 +127,16 @@ namespace Blog.Core.Repository.Base
         /// <param name="entity">实体类</param>
         /// <param name="insertColumns">指定只插入列</param>
         /// <returns>返回自增量列</returns>
-        public async Task<int> Add(TEntity entity, Expression<Func<TEntity, object>> insertColumns = null)
+        public async Task<long> Add(TEntity entity, Expression<Func<TEntity, object>> insertColumns = null)
         {
             var insert = _db.Insertable(entity);
             if (insertColumns == null)
             {
-                return await insert.ExecuteReturnIdentityAsync();
+                return await insert.ExecuteReturnSnowflakeIdAsync();
             }
             else
             {
-                return await insert.InsertColumns(insertColumns).ExecuteReturnIdentityAsync();
+                return await insert.InsertColumns(insertColumns).ExecuteReturnSnowflakeIdAsync();
             }
         }
 
@@ -126,9 +145,9 @@ namespace Blog.Core.Repository.Base
         /// </summary>
         /// <param name="listEntity">实体集合</param>
         /// <returns>影响行数</returns>
-        public async Task<int> Add(List<TEntity> listEntity)
+        public async Task<List<long>> Add(List<TEntity> listEntity)
         {
-            return await _db.Insertable(listEntity.ToArray()).ExecuteCommandAsync();
+            return await _db.Insertable(listEntity.ToArray()).ExecuteReturnSnowflakeIdListAsync();
         }
 
         /// <summary>
@@ -142,6 +161,15 @@ namespace Blog.Core.Repository.Base
             //var i = await Task.Run(() => _db.Updateable(entity).ExecuteCommand());
             //return i > 0;
             //这种方式会以主键为条件
+            return await _db.Updateable(entity).ExecuteCommandHasChangeAsync();
+        }
+        /// <summary>
+        /// 更新实体数据
+        /// </summary>
+        /// <param name="entity">博文实体类</param>
+        /// <returns></returns>
+        public async Task<bool> Update(List<TEntity> entity)
+        {
             return await _db.Updateable(entity).ExecuteCommandHasChangeAsync();
         }
 
@@ -161,25 +189,28 @@ namespace Blog.Core.Repository.Base
         }
 
         public async Task<bool> Update(
-          TEntity entity,
-          List<string> lstColumns = null,
-          List<string> lstIgnoreColumns = null,
-          string where = ""
-            )
+            TEntity entity,
+            List<string> lstColumns = null,
+            List<string> lstIgnoreColumns = null,
+            string where = ""
+        )
         {
             IUpdateable<TEntity> up = _db.Updateable(entity);
             if (lstIgnoreColumns != null && lstIgnoreColumns.Count > 0)
             {
                 up = up.IgnoreColumns(lstIgnoreColumns.ToArray());
             }
+
             if (lstColumns != null && lstColumns.Count > 0)
             {
                 up = up.UpdateColumns(lstColumns.ToArray());
             }
+
             if (!string.IsNullOrEmpty(where))
             {
                 up = up.Where(where);
             }
+
             return await up.ExecuteCommandHasChangeAsync();
         }
 
@@ -200,7 +231,7 @@ namespace Blog.Core.Repository.Base
         /// <returns></returns>
         public async Task<bool> DeleteById(object id)
         {
-            return await _db.Deleteable<TEntity>(id).ExecuteCommandHasChangeAsync();
+            return await _db.Deleteable<TEntity>().In(id).ExecuteCommandHasChangeAsync();
         }
 
         /// <summary>
@@ -212,7 +243,6 @@ namespace Blog.Core.Repository.Base
         {
             return await _db.Deleteable<TEntity>().In(ids).ExecuteCommandHasChangeAsync();
         }
-
 
 
         /// <summary>
@@ -284,6 +314,7 @@ namespace Blog.Core.Repository.Base
         {
             return await _db.Queryable<TEntity>().WhereIF(whereExpression != null, whereExpression).OrderByIF(orderByFields != null, orderByFields).ToListAsync();
         }
+
         /// <summary>
         /// 功能描述:查询一个列表
         /// </summary>
@@ -393,16 +424,14 @@ namespace Blog.Core.Repository.Base
         /// <param name="orderByFields">排序字段，如name asc,age desc</param>
         /// <returns>数据列表</returns>
         public async Task<List<TEntity>> Query(
-          string where,
-          int pageIndex,
-          int pageSize,
-
-          string orderByFields)
+            string where,
+            int pageIndex,
+            int pageSize,
+            string orderByFields)
         {
             return await _db.Queryable<TEntity>().OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
                 .WhereIF(!string.IsNullOrEmpty(where), where).ToPageListAsync(pageIndex, pageSize);
         }
-
 
 
         /// <summary>
@@ -415,12 +444,11 @@ namespace Blog.Core.Repository.Base
         /// <returns></returns>
         public async Task<PageModel<TEntity>> QueryPage(Expression<Func<TEntity, bool>> whereExpression, int pageIndex = 1, int pageSize = 20, string orderByFields = null)
         {
-
             RefAsync<int> totalCount = 0;
             var list = await _db.Queryable<TEntity>()
-             .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
-             .WhereIF(whereExpression != null, whereExpression)
-             .ToPageListAsync(pageIndex, pageSize, totalCount);
+                .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
+                .WhereIF(whereExpression != null, whereExpression)
+                .ToPageListAsync(pageIndex, pageSize, totalCount);
 
             return new PageModel<TEntity>(pageIndex, totalCount, pageSize, list);
         }
@@ -446,6 +474,7 @@ namespace Blog.Core.Repository.Base
             {
                 return await _db.Queryable(joinExpression).Select(selectExpression).ToListAsync();
             }
+
             return await _db.Queryable(joinExpression).Where(whereLambda).Select(selectExpression).ToListAsync();
         }
 
@@ -471,13 +500,12 @@ namespace Blog.Core.Repository.Base
             int pageSize = 20,
             string orderByFields = null)
         {
-
             RefAsync<int> totalCount = 0;
             var list = await _db.Queryable<T, T2>(joinExpression)
-             .Select(selectExpression)
-             .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
-             .WhereIF(whereExpression != null, whereExpression)
-             .ToPageListAsync(pageIndex, pageSize, totalCount);
+                .Select(selectExpression)
+                .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
+                .WhereIF(whereExpression != null, whereExpression)
+                .ToPageListAsync(pageIndex, pageSize, totalCount);
             return new PageModel<TResult>(pageIndex, totalCount, pageSize, list);
         }
 
@@ -506,10 +534,10 @@ namespace Blog.Core.Repository.Base
         {
             RefAsync<int> totalCount = 0;
             var list = await _db.Queryable<T, T2>(joinExpression).GroupBy(groupExpression)
-             .Select(selectExpression)
-             .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
-             .WhereIF(whereExpression != null, whereExpression)
-             .ToPageListAsync(pageIndex, pageSize, totalCount);
+                .Select(selectExpression)
+                .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
+                .WhereIF(whereExpression != null, whereExpression)
+                .ToPageListAsync(pageIndex, pageSize, totalCount);
             return new PageModel<TResult>(pageIndex, totalCount, pageSize, list);
         }
 
@@ -532,6 +560,80 @@ namespace Blog.Core.Repository.Base
         //        jobName = s.jobName
         //    }, exp, s => new { s.uID, s.uRealName, s.groupName, s.jobName }, model.currentPage, model.pageSize, model.orderField + " " + model.orderType);
 
-    }
+        #region Split分表基础接口 （基础CRUD）
 
+        /// <summary>
+        /// 分页查询[使用版本，其他分页未测试]
+        /// </summary>
+        /// <param name="whereExpression">条件表达式</param>
+        /// <param name="pageIndex">页码（下标0）</param>
+        /// <param name="pageSize">页大小</param>
+        /// <param name="orderByFields">排序字段，如name asc,age desc</param>
+        /// <returns></returns>
+        public async Task<PageModel<TEntity>> QueryPageSplit(Expression<Func<TEntity, bool>> whereExpression, DateTime beginTime, DateTime endTime, int pageIndex = 1, int pageSize = 20, string orderByFields = null)
+        {
+            RefAsync<int> totalCount = 0;
+            var list = await _db.Queryable<TEntity>().SplitTable(beginTime, endTime)
+                .OrderByIF(!string.IsNullOrEmpty(orderByFields), orderByFields)
+                .WhereIF(whereExpression != null, whereExpression)
+                .ToPageListAsync(pageIndex, pageSize, totalCount);
+            var data = new PageModel<TEntity>(pageIndex, totalCount, pageSize, list);
+            return data;
+        }
+
+        /// <summary>
+        /// 写入实体数据
+        /// </summary>
+        /// <param name="entity">数据实体</param>
+        /// <returns></returns>
+        public async Task<List<long>> AddSplit(TEntity entity)
+        {
+            var insert = _db.Insertable(entity).SplitTable();
+            //插入并返回雪花ID并且自动赋值ID　
+            return await insert.ExecuteReturnSnowflakeIdListAsync();
+        }
+
+        /// <summary>
+        /// 更新实体数据
+        /// </summary>
+        /// <param name="entity">数据实体</param>
+        /// <returns></returns>
+        public async Task<bool> UpdateSplit(TEntity entity, DateTime dateTime)
+        {
+            //直接根据实体集合更新 （全自动 找表更新）
+            //return await _db.Updateable(entity).SplitTable().ExecuteCommandAsync();//,SplitTable不能少
+
+            //精准找单个表
+            var tableName = _db.SplitHelper<TEntity>().GetTableName(dateTime); //根据时间获取表名
+            return await _db.Updateable(entity).AS(tableName).ExecuteCommandHasChangeAsync();
+        }
+
+        /// <summary>
+        /// 删除数据
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <param name="dateTime"></param>
+        /// <returns></returns>
+        public async Task<bool> DeleteSplit(TEntity entity, DateTime dateTime)
+        {
+            ////直接根据实体集合删除 （全自动 找表插入）,返回受影响数
+            //return await _db.Deleteable(entity).SplitTable().ExecuteCommandAsync();//,SplitTable不能少
+
+            //精准找单个表
+            var tableName = _db.SplitHelper<TEntity>().GetTableName(dateTime); //根据时间获取表名
+            return await _db.Deleteable<TEntity>().AS(tableName).Where(entity).ExecuteCommandHasChangeAsync();
+        }
+
+        /// <summary>
+        /// 根据ID查找数据
+        /// </summary>
+        /// <param name="objId"></param>
+        /// <returns></returns>
+        public async Task<TEntity> QueryByIdSplit(object objId)
+        {
+            return await _db.Queryable<TEntity>().In(objId).SplitTable(tabs => tabs).SingleAsync();
+        }
+
+        #endregion
+    }
 }

@@ -6,6 +6,10 @@
 
 [![sdk](https://img.shields.io/badge/sdk-6.0.1-d.svg)](#)  [![Build status](https://github.com/anjoy8/blog.core/workflows/.NET%20Core/badge.svg)](https://github.com/anjoy8/Blog.Core/actions)  [![Build Status](https://dev.azure.com/laozhangisphi/anjoy8/_apis/build/status/anjoy8.Blog.Core?branchName=master)](https://dev.azure.com/laozhangisphi/anjoy8/_build?definitionId=1)  [![codecov](https://codecov.io/gh/anjoy8/Blog.Core/branch/master/graph/badge.svg)](https://codecov.io/gh/anjoy8/Blog.Core)  [![License MIT](https://img.shields.io/badge/license-Apache-blue.svg?style=flat-square)](https://github.com/anjoy8/Blog.Core/blob/master/LICENSE) [![star this repo](http://githubbadges.com/star.svg?user=anjoy8&repo=blog.core&style=flat)](https://github.com/boennemann/badges)  [![fork this repo](http://githubbadges.com/fork.svg?user=anjoy8&repo=blog.core&style=flat)](https://github.com/boennemann/badges/fork)  [![博客园](https://img.shields.io/badge/博客园-老张的哲学-brightgreen.svg)](https://www.cnblogs.com/laozhang-is-phi/)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=anjoy8/blog.core&type=Date)](https://star-history.com/#anjoy8/blog.core&Date)
+
 
 &nbsp;
 &nbsp;
@@ -19,42 +23,35 @@
  
 </div>
 
-
+-------------------------------
 Blog.Core 开箱即用的企业级前后端分离【 .NET Core6.0 Api + Vue 2.x + RBAC】权限框架。  
 其他版本看具体分支吧🎉  
 官网：http://apk.neters.club/.doc/    
 
   
+---------------------
+
+**已被近100家公司所使用(🐱‍🚀)：[点击查看列表](https://github.com/anjoy8/Blog.Core/issues/75)**   欢迎盖楼，留下公司真实名字的，可得定制化指导服务。  
+同时如果企业有付费咨询，欢迎联系老张（QQ：3143422472）。
   
-**已被多家公司所使用(80+🐱‍🚀)：[点击查看列表](https://github.com/anjoy8/Blog.Core/issues/75)**   欢迎盖楼，留下公司真实名字的，可得定制化指导服务。
-  
-项目单体部署，并发在400~500，一切正常(不保证自己的各种错误写法)。  
-如果搭配负载，效果更好。
+
+### 核心项目组成员（排名不分先后）
+
+[hudingwen](https://github.com/hudingwen)、[LemonNoCry](https://github.com/LemonNoCry)、、[Jamnine何拾玖](https://github.com/Jamnine)、
+
 
 #### ❤ 真实用户反馈 ❤
 ```
+项目单体部署，并发在400~500，一切正常(不保证自己的各种错误写法)。  
+如果搭配负载，效果更好。
+
 1、A~CoderDong:
 应用场景：使用Blog.Core为基础骨架开发，搭建Client监控类守护进程项目，To C 客户群，
 并发情况：目前压测并发5k正常8秒处理完，并发10k可15秒处理完毕，异常不会丢失。
 生产配置：一台服务器（Linux环境 + 至强8核的16G内存 + mysql数据库 + 3台Nginx负载）
 
 ```
-  
-
-
-
-&nbsp;
-
-#### Dokcer 快速启动
-如果想在服务器或者本地快速查看接口效果，直接Docker启动容器即可：
-```
- # 可以挂载配置文件和日志文件
- # 这里只是接口效果，想看前端效果，可以异步Blog.Admin查看后台管理系统
- docker run --name=apkcontainer -d \
-  -v /data/appsettings.json:/app/appsettings.json \
-  -v /data/Log/:/app/Log \
- -it -p 9291:9291 laozhangisphi/apkimg
-```
+   
  
  
 &nbsp;
@@ -67,20 +64,43 @@ Blog.Core 开箱即用的企业级前后端分离【 .NET Core6.0 Api + Vue 2.x 
 
 ### 功能与进度
 
-框架模块：  
+#### 企业使用高级版本
+
+- [x] 包含开源版 `框架模块/组件模块` 中的所有功能；
+- [x] 全部表结构主键底层架构改成`string`类型（默认雪花，支持guid），更方便迁移；
+- [x] 完善部门数据权限，可以基于策略配置查看数据范围；
+- [x] 优化权限处理器，解决多实例分布式下，权限不同步问题（必须配置Redis）；
+- [x] 增加在线用户查看功能，并实现强制用户下线功能（必须配置Redis）；
+- [x] 增加用户黑名单功能（必须配置Redis）；
+- [x] 增加岗位功能（单独建表），配合部门使用；
+- [ ] 后期优化站内通知功能，其实目前已经有SignalR来实现消息推送了，可以直接用；
+- [ ] 前端`Blog.Admin.Pro`使用`AntDesignVue`框架（设计中，未完全实现）；
+- [x] 铁粉奖励：如果参与上述功能和其他付费功能开发，可半价获取商业授权；
+
+
+
+#### 框架模块：  
 - [x] 采用`仓储+服务+接口`的形式封装框架；
-- [x] 异步 async/await 开发；
-- [x] 接入国产数据库ORM组件 —— SqlSugar，封装数据库操作；
+- [x] 自定义项目模板 `CreateYourProject.bat` ，可以一键生成自己的项目；🎶  
+- [x] 异步 async/await 开发；  
+- [x] 接入国产数据库ORM组件 —— SqlSugar，封装数据库操作，支持级联操作；
 - [x] 支持自由切换多种数据库，MySql/SqlServer/Sqlite/Oracle/Postgresql/达梦/人大金仓；
 - [x] 实现项目启动，自动生成种子数据 ✨； 
-- [x] 五种日志记录，审计/异常/请求响应/服务操作/Sql记录等； 
+- [x] 实现数据库主键类型配置化，什么类型都可以自定义 ✨； 
+- [x] 五种日志记录，审计/异常/请求响应/服务操作/Sql记录等,并自动持久化到数据库表🎶； 
 - [x] 支持项目事务处理（若要分布式，用cap即可）✨；
 - [x] 设计4种 AOP 切面编程，功能涵盖：日志、缓存、审计、事务 ✨；
+- [x] 全局统一封装 Serilog 生成多种日志，并自动生成到数据库中，目前支持MySql/SqlServer/Sqlite/Oracle/Postgresql🎉；
+- [x] 设计并支持按钮级别的RBAC权限控制，同时支持一键同步接口和菜单 🎶；
 - [x] 支持 T4 代码模板，自动生成每层代码；
 - [x] 或使用 DbFirst 一键创建自己项目的四层文件（支持多库）；
 - [x] 封装`Blog.Core.Webapi.Template`项目模板，一键重建自己的项目 ✨；
 - [x] 搭配多个前端案例供参考和借鉴：Blog.Vue、Blog.Admin、Nuxt.tbug、Blog.Mvp.Blazor ✨；
 - [x] 统一集成 IdentityServer4 认证 ✨;
+- [x] 统一实现多租户;
+- [x] 实现分表案例，支持分表的增删改查哈分页查询，具体查看SplitDemoController.cs;
+- [x] 支持signalR对指定用户通讯;  
+
 
 组件模块：
 - [x] 提供 Redis 做缓存处理；
@@ -90,7 +110,7 @@ Blog.Core 开箱即用的企业级前后端分离【 .NET Core6.0 Api + Vue 2.x 
 - [x] 使用 AutoFac 做依赖注入容器，并提供批量服务注入 ✨；
 - [x] 支持 CORS 跨域；
 - [x] 封装 JWT 自定义策略授权；
-- [x] 使用 Log4Net 日志框架，集成原生 ILogger 接口做日志记录；
+- [x] 使用 Serilog 日志框架，集成原生 ILogger 接口做日志记录；
 - [x] 使用 SignalR 双工通讯 ✨；
 - [x] 添加 IpRateLimiting 做 API 限流处理;
 - [x] 使用 Quartz.net 做任务调度（目前单机多任务，集群调度暂不支持）;
@@ -105,15 +125,32 @@ Blog.Core 开箱即用的企业级前后端分离【 .NET Core6.0 Api + Vue 2.x 
 - [x] 新增 Kafka 消息队列，并配合实现EventBus ✨;
 - [x] 新增 微信公众号管理，并集成到Blog.Admin后台 ✨;
 - [x] 新增 - 数据部门权限;
+- [x] 新增 - Serilog 集成日志数据持久化到数据库;  
+- [x] 新增 - 多租户模式（单表，多表，多库三种模式）;  
+
 
 微服务模块：
 - [x] 可配合 Docker 实现容器化；
 - [x] 可配合 Jenkins 实现CI / CD；
 - [x] 可配合 Consul 实现服务发现；
 - [x] 可配合 Nacos 实现服务发现；
-- [x] 可配合 Ocelot 实现网关处理；
+- [x] 可配合 apisix/Ocelot 实现网关处理；
 - [x] 可配合 Nginx  实现负载均衡；
 - [x] 可配合 Ids4   实现认证中心；
+
+### 核心业务模块
+#### 框架采用泛型仓储模式，以下几层为核心层，不可删除    
+`Blog.Core.Api`、`Blog.Core.Common`、`Blog.Core.IServices`、`Blog.Core.Model`、`Blog.Core.Repository`、`Blog.Core.Services`、`Blog.Core.Tasks`、`Blog.Core.Serilog`    
+其他代码分层是支撑层，如果自己业务涉及不到，可以删除。
+
+#### API接口层主要是基于RBAC的基于按钮级别的角色授权逻辑，以下几个Controller，不可删除    
+`BaseApiController.cs`(接口基类)、`DepartmentController`(部门)、`ImgController`(图片)、`LoginController`(登录)、`ModuleController`(接口)、`PermissionController`(菜单)、`RoleController`(角色)、`TasksQzController`(任务调度)、`UserController`(用户)、`UserRoleController`(用户角色关系)     
+其他代码部分是扩展业务，如果自己业务涉及不到，可以删除。
+
+
+
+### 自定义全部日志记录图
+![系统架构图](https://img.neters.club/github/log5.png)
 
 
 ### 自定义(中间件/服务)启动图
@@ -219,11 +256,8 @@ Contributions of any kind are welcome!
 
 ## 售后服务与支持  
 
-鼓励作者，简单打赏，入微信群，随时随地解答我框架中（NetCore、Vue、DDD、IdentityServer4等）的疑难杂症。     
-注意主要是帮忙解决bug和思路，不会远程授课，但是可以适当发我代码，我帮忙调试，       
-打赏的时候，备注自己的微信号，我拉你进群，两天内没回应，QQ私聊我（3143422472）；   
-
-[赞赏列表](http://apk.neters.club/.doc/Contribution/)  
+鼓励作者，简单打赏~~         
+如果你喜欢，就给作者加个鸡腿吧  
 
  
 <img src="http://apk.neters.club/laozhangisphigood.jpg" alt="赞赏码" width="300" >

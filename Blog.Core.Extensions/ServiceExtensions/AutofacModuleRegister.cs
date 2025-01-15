@@ -3,19 +3,21 @@ using Autofac.Extras.DynamicProxy;
 using Blog.Core.AOP;
 using Blog.Core.Common;
 using Blog.Core.IRepository.Base;
+using Blog.Core.IServices.BASE;
 using Blog.Core.Model;
 using Blog.Core.Repository.Base;
-using log4net;
+using Blog.Core.Repository.UnitOfWorks;
+using Blog.Core.Services.BASE;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using Serilog;
 
 namespace Blog.Core.Extensions
 {
     public class AutofacModuleRegister : Autofac.Module
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(AutofacModuleRegister));
         protected override void Load(ContainerBuilder builder)
         {
             var basePath = AppContext.BaseDirectory;
@@ -30,52 +32,60 @@ namespace Blog.Core.Extensions
             if (!(File.Exists(servicesDllFile) && File.Exists(repositoryDllFile)))
             {
                 var msg = "Repository.dll和service.dll 丢失，因为项目解耦了，所以需要先F6编译，再F5运行，请检查 bin 文件夹，并拷贝。";
-                log.Error(msg);
+                Log.Error(msg);
                 throw new Exception(msg);
             }
 
 
-
             // AOP 开关，如果想要打开指定的功能，只需要在 appsettigns.json 对应对应 true 就行。
             var cacheType = new List<Type>();
-            if (Appsettings.app(new string[] { "AppSettings", "RedisCachingAOP", "Enabled" }).ObjToBool())
-            {
-                builder.RegisterType<BlogRedisCacheAOP>();
-                cacheType.Add(typeof(BlogRedisCacheAOP));
-            }
-            if (Appsettings.app(new string[] { "AppSettings", "MemoryCachingAOP", "Enabled" }).ObjToBool())
+            if (AppSettings.app(new string[] { "AppSettings", "CachingAOP", "Enabled" }).ObjToBool())
             {
                 builder.RegisterType<BlogCacheAOP>();
                 cacheType.Add(typeof(BlogCacheAOP));
             }
-            if (Appsettings.app(new string[] { "AppSettings", "TranAOP", "Enabled" }).ObjToBool())
+
+            if (AppSettings.app(new string[] { "AppSettings", "TranAOP", "Enabled" }).ObjToBool())
             {
                 builder.RegisterType<BlogTranAOP>();
                 cacheType.Add(typeof(BlogTranAOP));
             }
-            if (Appsettings.app(new string[] { "AppSettings", "LogAOP", "Enabled" }).ObjToBool())
+
+            if (AppSettings.app(new string[] { "AppSettings", "LogAOP", "Enabled" }).ObjToBool())
             {
                 builder.RegisterType<BlogLogAOP>();
                 cacheType.Add(typeof(BlogLogAOP));
             }
 
-            builder.RegisterGeneric(typeof(BaseRepository<>)).As(typeof(IBaseRepository<>)).InstancePerDependency();//注册仓储
+            if (AppSettings.app(new string[] { "AppSettings", "UserAuditAOP", "Enabled" }).ObjToBool())
+            {
+                builder.RegisterType<BlogUserAuditAOP>();
+                cacheType.Add(typeof(BlogUserAuditAOP));
+            }
+
+            builder.RegisterGeneric(typeof(BaseRepository<>)).As(typeof(IBaseRepository<>)).InstancePerDependency(); //注册仓储
+            builder.RegisterGeneric(typeof(BaseServices<>)).As(typeof(IBaseServices<>)).InstancePerDependency();     //注册服务
 
             // 获取 Service.dll 程序集服务，并注册
             var assemblysServices = Assembly.LoadFrom(servicesDllFile);
             builder.RegisterAssemblyTypes(assemblysServices)
-                      .AsImplementedInterfaces()
-                      .InstancePerDependency()
-                      .PropertiesAutowired()
-                      .EnableInterfaceInterceptors()//引用Autofac.Extras.DynamicProxy;
-                      .InterceptedBy(cacheType.ToArray());//允许将拦截器服务的列表分配给注册。
+                .AsImplementedInterfaces()
+                .InstancePerDependency()
+                .PropertiesAutowired()
+                .EnableInterfaceInterceptors()       //引用Autofac.Extras.DynamicProxy;
+                .InterceptedBy(cacheType.ToArray()); //允许将拦截器服务的列表分配给注册。
 
             // 获取 Repository.dll 程序集服务，并注册
             var assemblysRepository = Assembly.LoadFrom(repositoryDllFile);
             builder.RegisterAssemblyTypes(assemblysRepository)
-                   .AsImplementedInterfaces()
-                   .PropertiesAutowired()
-                   .InstancePerDependency();
+                .AsImplementedInterfaces()
+                .PropertiesAutowired()
+                .InstancePerDependency();
+
+            builder.RegisterType<UnitOfWorkManage>().As<IUnitOfWorkManage>()
+                .AsImplementedInterfaces()
+                .InstancePerLifetimeScope()
+                .PropertiesAutowired();
 
             #endregion
 
@@ -95,6 +105,7 @@ namespace Blog.Core.Extensions
             builder.RegisterAssemblyTypes(Assembly.GetAssembly(typeof(Love)))
                 .EnableClassInterceptors()
                 .InterceptedBy(cacheType.ToArray());
+
             #endregion
 
             #region 单独注册一个含有接口的类，启用interface代理拦截
@@ -104,8 +115,8 @@ namespace Blog.Core.Extensions
             //   .AsImplementedInterfaces()
             //   .EnableInterfaceInterceptors()
             //   .InterceptedBy(typeof(BlogCacheAOP));
-            #endregion
 
+            #endregion
         }
     }
 }

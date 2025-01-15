@@ -6,19 +6,12 @@ using Blog.Core.IServices;
 using Blog.Core.Model;
 using Blog.Core.Model.ViewModels;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using Blog.Core.Extensions.Middlewares;
 
 namespace Blog.Core.Controllers
@@ -69,9 +62,10 @@ namespace Blog.Core.Controllers
         [HttpGet]
         public MessageModel<List<LogInfo>> Get()
         {
-
-            _hubContext.Clients.All.SendAsync("ReceiveUpdate", LogLock.GetLogData()).Wait();
-
+            if (AppSettings.app(new string[] { "Middleware", "SignalRSendLog", "Enabled" }).ObjToBool())
+            {
+                _hubContext.Clients.All.SendAsync("ReceiveUpdate", LogLock.GetLogData()).Wait();
+            }
             return Success<List<LogInfo>>(null, "执行成功");
         }
 
@@ -225,7 +219,7 @@ namespace Blog.Core.Controllers
         {
             List<ApiDate> apiDates = new List<ApiDate>();
 
-            if (Appsettings.app(new string[] { "MutiDBEnabled" }).ObjToBool())
+            if (_applicationUserServices.IsEnable())
             {
                 var users = await _applicationUserServices.Query(d => d.tdIsDelete == false);
 

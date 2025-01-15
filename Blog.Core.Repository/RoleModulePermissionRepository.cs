@@ -1,10 +1,10 @@
-using Blog.Core.Repository.Base;
-using Blog.Core.Model.Models;
 using Blog.Core.IRepository;
+using Blog.Core.Model.Models;
+using Blog.Core.Repository.Base;
+using SqlSugar;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using SqlSugar;
-using Blog.Core.IRepository.UnitOfWork;
+using Blog.Core.Repository.UnitOfWorks;
 
 namespace Blog.Core.Repository
 {
@@ -13,7 +13,7 @@ namespace Blog.Core.Repository
     /// </summary>	
     public class RoleModulePermissionRepository : BaseRepository<RoleModulePermission>, IRoleModulePermissionRepository
     {
-        public RoleModulePermissionRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
+        public RoleModulePermissionRepository(IUnitOfWorkManage unitOfWorkManage) : base(unitOfWorkManage)
         {
         }
 
@@ -99,7 +99,7 @@ namespace Blog.Core.Repository
         /// <param name="permissionId">菜单主键</param>
         /// <param name="moduleId">接口主键</param>
         /// <returns></returns>
-        public async Task UpdateModuleId(int permissionId, int moduleId)
+        public async Task UpdateModuleId(long permissionId, long moduleId)
         {
             await Db.Updateable<RoleModulePermission>(it => it.ModuleId == moduleId).Where(
                 it => it.PermissionId == permissionId).ExecuteCommandAsync();

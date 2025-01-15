@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-using System.Threading.Tasks;
+﻿using System.Linq.Expressions;
 using Blog.Core.Common.HttpContextUser;
 using Blog.Core.IServices;
 using Blog.Core.Model;
@@ -37,15 +34,14 @@ namespace Blog.Core.Controllers
         /// <returns></returns>
         // GET: api/User
         [HttpGet]
-        public async Task<MessageModel<PageModel<Modules>>> Get(int page = 1, string key = "")
+        public async Task<MessageModel<PageModel<Modules>>> Get(int page = 1, string key = "", int pageSize = 50)
         {
             if (string.IsNullOrEmpty(key) || string.IsNullOrWhiteSpace(key))
             {
                 key = "";
             }
-            int intPageSize = 50;
 
-            Expression<Func<Modules, bool>> whereExpression = a => a.IsDeleted != true && (a.Name != null && a.Name.Contains(key));
+            Expression<Func<Modules, bool>> whereExpression = a => a.IsDeleted != true && ((a.Name != null && a.Name.Contains(key) || (a.LinkUrl != null && a.LinkUrl.Contains(key))));
 
             PageModel<Modules> data = new PageModel<Modules>();
 
@@ -56,7 +52,7 @@ namespace Blog.Core.Controllers
             }
             else
             {
-                data = await _moduleServices.QueryPage(whereExpression, page, intPageSize, " Id desc ");
+                data = await _moduleServices.QueryPage(whereExpression, page, pageSize, " Id desc ");
             }
 
 
@@ -122,7 +118,7 @@ namespace Blog.Core.Controllers
         /// <returns></returns>
         // DELETE: api/ApiWithActions/5
         [HttpDelete]
-        public async Task<MessageModel<string>> Delete(int id)
+        public async Task<MessageModel<string>> Delete(long id)
         {
             if (id <= 0)
                 return Failed("缺少参数");

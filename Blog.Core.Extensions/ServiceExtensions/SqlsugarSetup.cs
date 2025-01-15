@@ -1,13 +1,14 @@
 ﻿using Blog.Core.Common;
+using Blog.Core.Common.Const;
 using Blog.Core.Common.DB;
-using Blog.Core.Common.Helper;
-using Blog.Core.Common.LogHelper;
+using Blog.Core.Common.DB.Aop;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using SqlSugar;
-using StackExchange.Profiling;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Blog.Core.Common.Caches;
+using System.Text.RegularExpressions;
+using Blog.Core.Common.Option;
+using Blog.Core.Common.Utility;
 
 namespace Blog.Core.Extensions
 {
@@ -16,85 +17,118 @@ namespace Blog.Core.Extensions
     /// </summary>
     public static class SqlsugarSetup
     {
+        private static readonly MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
+
         public static void AddSqlsugarSetup(this IServiceCollection services)
         {
             if (services == null) throw new ArgumentNullException(nameof(services));
 
+            StaticConfig.CustomSnowFlakeFunc = IdGeneratorUtility.NextId;
+
             // 默认添加主数据库连接
-            MainDb.CurrentDbConnId = Appsettings.app(new string[] { "MainDB" });
-
-            // 把多个连接对象注入服务，这里必须采用Scope，因为有事务操作
-            services.AddScoped<ISqlSugarClient>(o =>
+            if (!AppSettings.app("MainDB").IsNullOrEmpty())
             {
-                // 连接字符串
-                var listConfig = new List<ConnectionConfig>();
-                // 从库
-                var listConfig_Slave = new List<SlaveConnectionConfig>();
-                BaseDBConfig.MutiConnectionString.slaveDbs.ForEach(s =>
-                {
-                    listConfig_Slave.Add(new SlaveConnectionConfig()
-                    {
-                        HitRate = s.HitRate,
-                        ConnectionString = s.Connection
-                    });
-                });
+                MainDb.CurrentDbConnId = AppSettings.app("MainDB");
+            }
 
-                BaseDBConfig.MutiConnectionString.allDbs.ForEach(m =>
+            BaseDBConfig.MutiConnectionString.allDbs.ForEach(m =>
+            {
+                var config = new ConnectionConfig()
                 {
-                    listConfig.Add(new ConnectionConfig()
+                    ConfigId = m.ConnId.ObjToString().ToLower(),
+                    ConnectionString = m.Connection,
+                    DbType = (DbType)m.DbType,
+                    IsAutoCloseConnection = true,
+                    // Check out more information: https://github.com/anjoy8/Blog.Core/issues/122
+                    //IsShardSameThread = false,
+                    MoreSettings = new ConnMoreSettings()
                     {
-                        ConfigId = m.ConnId.ObjToString().ToLower(),
-                        ConnectionString = m.Connection,
-                        DbType = (DbType)m.DbType,
-                        IsAutoCloseConnection = true,
-                        // Check out more information: https://github.com/anjoy8/Blog.Core/issues/122
-                        //IsShardSameThread = false,
-                        AopEvents = new AopEvents
+                        //IsWithNoLockQuery = true,
+                        IsAutoRemoveDataCache = true,
+                        SqlServerCodeFirstNvarchar = true,
+                    },
+                    // 从库
+                    SlaveConnectionConfigs = m.Slaves?.Where(s => s.HitRate > 0).Select(s => new SlaveConnectionConfig
+                    {
+                        ConnectionString = s.Connection,
+                        HitRate = s.HitRate
+                    }).ToList(),
+                    // 自定义特性
+                    ConfigureExternalServices = new ConfigureExternalServices()
+                    {
+                        //不建议使用,性能有很大问题,会导致redis堆积
+                        //核心问题在于SqlSugar，每次query都会查缓存, insert\update\delete,又会频繁GetAllKey，导致性能特别低
+                        DataInfoCacheService = new SqlSugarCacheService(),
+                        EntityService = (property, column) =>
                         {
-                            OnLogExecuting = (sql, p) =>
+                            if (column.IsPrimarykey && property.PropertyType == typeof(int))
                             {
-                                if (Appsettings.app(new string[] { "AppSettings", "SqlAOP", "Enabled" }).ObjToBool())
-                                {
-                                    if (Appsettings.app(new string[] { "AppSettings", "SqlAOP", "OutToLogFile", "Enabled" }).ObjToBool())
-                                    {
-                                        Parallel.For(0, 1, e =>
-                                        {
-                                            MiniProfiler.Current.CustomTiming("SQL：", GetParas(p) + "【SQL语句】：" + sql);
-                                            LogLock.OutSql2Log("SqlLog", new string[] { GetParas(p), "【SQL语句】：" + sql });
-
-                                        });
-                                    }
-                                    if (Appsettings.app(new string[] { "AppSettings", "SqlAOP", "OutToConsole", "Enabled" }).ObjToBool())
-                                    {
-                                        ConsoleHelper.WriteColorLine(string.Join("\r\n", new string[] { "--------", "【SQL语句】：" + GetWholeSql(p, sql) }), ConsoleColor.DarkCyan);
-                                    }
-                                }
-                            },
-                        },
-                        MoreSettings = new ConnMoreSettings()
-                        {
-                            //IsWithNoLockQuery = true,
-                            IsAutoRemoveDataCache = true
-                        },
-                        // 从库
-                        SlaveConnectionConfigs = listConfig_Slave,
-                        // 自定义特性
-                        ConfigureExternalServices = new ConfigureExternalServices()
-                        {
-                            EntityService = (property, column) =>
-                            {
-                                if (column.IsPrimarykey && property.PropertyType == typeof(int))
-                                {
-                                    column.IsIdentity = true;
-                                }
+                                column.IsIdentity = true;
                             }
-                        },
-                        InitKeyType = InitKeyType.Attribute
+                        }
+                    },
+                    InitKeyType = InitKeyType.Attribute
+                };
+                if (SqlSugarConst.LogConfigId.ToLower().Equals(m.ConnId.ToLower()))
+                {
+                    BaseDBConfig.LogConfig = config;
+                }
+                else
+                {
+                    if (string.Equals(config.ConfigId.ToString(), MainDb.CurrentDbConnId,
+                        StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        BaseDBConfig.MainConfig = config;
                     }
-                   );
-                });
-                return new SqlSugarScope(listConfig);
+                    else if (m.ConnId.ToLower().StartsWith(MainDb.CurrentDbConnId.ToLower()))
+                    {
+                        //复用连接
+                        BaseDBConfig.ReuseConfigs.Add(config);
+                    }
+
+
+                    BaseDBConfig.ValidConfig.Add(config);
+                }
+
+                BaseDBConfig.AllConfigs.Add(config);
             });
+
+            if (BaseDBConfig.LogConfig is null)
+            {
+                throw new ApplicationException("未配置Log库连接");
+            }
+
+            // SqlSugarScope是线程安全，可使用单例注入
+            // 参考：https://www.donet5.com/Home/Doc?typeId=1181
+            services.AddSingleton<ISqlSugarClient>(o =>
+            {
+                return new SqlSugarScope(BaseDBConfig.AllConfigs, db =>
+                {
+                    BaseDBConfig.ValidConfig.ForEach(config =>
+                    {
+                        var dbProvider = db.GetConnectionScope((string)config.ConfigId);
+
+                        // 打印SQL语句
+                        dbProvider.Aop.OnLogExecuting = (s, parameters) =>
+                        {
+                            SqlSugarAop.OnLogExecuting(dbProvider, App.User?.Name.ObjToString(), ExtractTableName(s),
+                                Enum.GetName(typeof(SugarActionType), dbProvider.SugarActionType), s, parameters,
+                                config);
+                        };
+
+                        // 数据审计
+                        dbProvider.Aop.DataExecuting = SqlSugarAop.DataExecuting;
+
+                        // 配置实体假删除过滤器
+                        RepositorySetting.SetDeletedEntityFilter(dbProvider);
+                        // 配置实体数据权限
+                        RepositorySetting.SetTenantEntityFilter(dbProvider);
+                    });
+                    //故障转移,检查主库链接自动切换备用连接
+                    SqlSugarReuse.AutoChangeAvailableConnect(db);
+                });
+            });
+            services.AddTransient<SqlSugarScope>(s => s.GetService<ISqlSugarClient>() as SqlSugarScope);
         }
 
         private static string GetWholeSql(SugarParameter[] paramArr, string sql)
@@ -116,6 +150,26 @@ namespace Blog.Core.Extensions
             }
 
             return key;
+        }
+
+        private static string ExtractTableName(string sql)
+        {
+            // 匹配 SQL 语句中的表名的正则表达式
+            //string regexPattern = @"\s*(?:UPDATE|DELETE\s+FROM|SELECT\s+\*\s+FROM)\s+(\w+)";
+            string regexPattern = @"(?i)(?:FROM|UPDATE|DELETE\s+FROM)\s+`(.+?)`";
+            Regex regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
+            Match match = regex.Match(sql);
+
+            if (match.Success)
+            {
+                // 提取匹配到的表名
+                return match.Groups[1].Value;
+            }
+            else
+            {
+                // 如果没有匹配到表名，则返回空字符串或者抛出异常等处理
+                return string.Empty;
+            }
         }
     }
 }

@@ -21,14 +21,13 @@ namespace Blog.Core.Services
 
         // 将多个仓储接口注入
         public RoleModulePermissionServices(
-            IRoleModulePermissionRepository dal, 
+            IRoleModulePermissionRepository dal,
             IBaseRepository<Modules> moduleRepository, 
             IBaseRepository<Role> roleRepository)
         {
             this._dal = dal;
             this._moduleRepository = moduleRepository;
             this._roleRepository = roleRepository;
-            base.BaseDal = dal;
         }
 
         /// <summary>
@@ -84,7 +83,7 @@ namespace Blog.Core.Services
         /// <param name="permissionId">菜单主键</param>
         /// <param name="moduleId">接口主键</param>
         /// <returns></returns>
-        public async Task UpdateModuleId(int permissionId, int moduleId)
+        public async Task UpdateModuleId(long permissionId, long moduleId)
         {
             await _dal.UpdateModuleId(permissionId, moduleId);
         }

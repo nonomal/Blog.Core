@@ -1,15 +1,12 @@
-﻿using Blog.Core.Common.Helper;
+﻿using Blog.Core.Common;
+using Blog.Core.Common.Helper;
 using Blog.Core.Common.LogHelper;
 using Blog.Core.Hubs;
 using Blog.Core.Model;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using StackExchange.Profiling;
-using System;
 
 namespace Blog.Core.Filter
 {
@@ -53,10 +50,13 @@ namespace Blog.Core.Filter
             MiniProfiler.Current.CustomTiming("Errors：", json.msg);
 
 
-            //采用log4net 进行错误日志记录
+            //进行错误日志记录
             _loggerHelper.LogError(json.msg + WriteLog(json.msg, context.Exception));
+            if (AppSettings.app(new string[] { "Middleware", "SignalRSendLog", "Enabled" }).ObjToBool())
+            {
+                _hubContext.Clients.All.SendAsync("ReceiveUpdate", LogLock.GetLogData()).Wait();
+            }
 
-            _hubContext.Clients.All.SendAsync("ReceiveUpdate", LogLock.GetLogData()).Wait();
 
         }
 

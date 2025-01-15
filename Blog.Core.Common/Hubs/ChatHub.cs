@@ -1,4 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Blog.Core.Common;
 using Blog.Core.Common.LogHelper;
 using Microsoft.AspNetCore.SignalR;
 
@@ -52,10 +55,23 @@ namespace Blog.Core.Hubs
         /// 当连接建立时运行
         /// </summary>
         /// <returns></returns>
-        public override Task OnConnectedAsync()
+        public override async Task OnConnectedAsync()
         {
-            //TODO..
-            return base.OnConnectedAsync();
+            await base.OnConnectedAsync();
+            if (Context.User?.Identity?.IsAuthenticated == true)
+            {
+                //按用户分组
+                //是有必要的 例如多个浏览器、多个标签页使用同个用户登录 应当归属于一组
+                await AddToGroup(Context.User.Identity.Name);
+
+                //加入角色组
+                //根据角色分组 例如管理员分组发送管理员的消息
+                var roles = Context.User.Claims.Where(s => s.Type == ClaimTypes.Role).ToList();
+                foreach (var role in roles)
+                {
+                    await AddToGroup(role.Value);
+                }
+            }
         }
 
         /// <summary>
@@ -72,7 +88,7 @@ namespace Blog.Core.Hubs
 
         public async Task SendMessage(string user, string message)
         {
-            await Clients.All.ReceiveMessage( user, message);
+            await Clients.All.ReceiveMessage(user, message);
         }
 
         //定于一个通讯管道，用来管理我们和客户端的连接
@@ -80,10 +96,14 @@ namespace Blog.Core.Hubs
         public async Task GetLatestCount(string random)
         {
             //2、服务端主动向客户端发送数据，名字千万不能错
-            await Clients.All.ReceiveUpdate(LogLock.GetLogData());
+            if (AppSettings.app(new string[] {"Middleware", "SignalRSendLog", "Enabled"}).ObjToBool())
+            {
+                //TODO 主动发送错误消息
+                await Clients.All.ReceiveUpdate(LogLock.GetLogData());
+            }
+
 
             //3、客户端再通过 ReceiveUpdate ，来接收
-
         }
     }
 }

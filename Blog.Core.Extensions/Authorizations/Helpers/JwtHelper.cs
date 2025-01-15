@@ -20,8 +20,8 @@ namespace Blog.Core.AuthHelper.OverWrite
         /// <returns></returns>
         public static string IssueJwt(TokenModelJwt tokenModel)
         {
-            string iss = Appsettings.app(new string[] { "Audience", "Issuer" });
-            string aud = Appsettings.app(new string[] { "Audience", "Audience" });
+            string iss = AppSettings.app(new string[] { "Audience", "Issuer" });
+            string aud = AppSettings.app(new string[] { "Audience", "Audience" });
             string secret = AppSecretConfig.Audience_Secret_String;
 
             //var claims = new Claim[] //old
@@ -36,8 +36,8 @@ namespace Blog.Core.AuthHelper.OverWrite
                     
 
                 new Claim(JwtRegisteredClaimNames.Jti, tokenModel.Uid.ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, $"{new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds()}"),
-                new Claim(JwtRegisteredClaimNames.Nbf,$"{new DateTimeOffset(DateTime.Now).ToUnixTimeSeconds()}") ,
+                new Claim(JwtRegisteredClaimNames.Iat, $"{DateTime.Now.DateToTimeStamp()}"),
+                new Claim(JwtRegisteredClaimNames.Nbf,$"{DateTime.Now.DateToTimeStamp()}") ,
                 //这个就是过期时间，目前是过期1000秒，可自定义，注意JWT有自己的缓冲过期时间
                 new Claim (JwtRegisteredClaimNames.Exp,$"{new DateTimeOffset(DateTime.Now.AddSeconds(1000)).ToUnixTimeSeconds()}"),
                 new Claim(ClaimTypes.Expiration, DateTime.Now.AddSeconds(1000).ToString()),
@@ -90,7 +90,7 @@ namespace Blog.Core.AuthHelper.OverWrite
 
                 tokenModelJwt = new TokenModelJwt
                 {
-                    Uid = (jwtToken.Id).ObjToInt(),
+                    Uid = (jwtToken.Id).ObjToLong(),
                     Role = role != null ? role.ObjToString() : "",
                 };
             }
